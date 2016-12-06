@@ -27,6 +27,7 @@ myApp.factory('MyAuthInterceptor', ['$window', '$q', '$log', function($window, $
         $log.debug('Начало авторизации');		
         return {
             request: function(config) {
+				// Перед каждым запросом добавляем token
                 config.headers = config.headers || {};
                 if ($window.localStorage.getItem('token')) {
 					// Подстановка значения token
@@ -35,6 +36,7 @@ myApp.factory('MyAuthInterceptor', ['$window', '$q', '$log', function($window, $
                 return config || $q.when(config);
             },
             response: function(response) {
+				// Если ответ "плохой", сообщаем что пользователь не авторизован
                 if (response.status === 401) {
                     $log.debug('Пользователь не авторизован!');
                 }
