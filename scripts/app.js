@@ -16,31 +16,60 @@ var myApp = angular.module('myApp', ['ngRoute'])
 		});
 	}]);
 
-myApp.controller('pageCtrl', ['$scope', function($scope) {	
-        
-	var self = this;
+
 	
-	// Объект для работы с API вконтакте
-	this.VK = {};
+myApp.service('serviceVK', [function() {	
+        		
+	var self = this;
+
+	this.loginStatus = false; // Статус авторизации
 	
 	// Авторизация
-	this.VK.login = function(){
+	this.login = function(){
+		// Вызов API		
 		VK.Auth.login(null, VK.access.FRIENDS);
+
+	};
+	
+	// Проверка авторизации
+	this.getLoginStatus = function(){
+		// Вызов API	
+		VK.Auth.getLoginStatus(function(response) { 					
+			if (response.session) { 
+				// Пользователь авторизован				
+				self.loginStatus = true;
+				console.log('Пользователь авторизован');
+			} else { 
+				// Пользователь не авторизован
+				self.loginStatus = false;
+				console.log('Пользователь не авторизован');
+			} 
+		});	
 	};
 	
 }]);
 
-// Модуль Авторизации вконтакте
+myApp.controller('pageCtrl', ['$scope', 'serviceVK', function($scope, serviceVK) {
+		
+	var self = this;
+	
+	this.VK = {};	
+	this.VK.login = function() {
+		serviceVK.login();
+	};
+}]);	
+
 
 
 // Эксперимент Interceptor 
-myApp.factory('MyAuthInterceptor', ['$window', '$q', '$log', function($window, $q, $log) {
-        $log.debug('Начало авторизации');
-		$log.debug($window.localStorage);
+myApp.factory('MyAuthInterceptor', ['$window', '$q', '$log', 'serviceVK', function($window, $q, $log, serviceVK) {
+        $log.debug('Начало авторизации');		
         return {
             request: function(config) {
 				// Перед каждым запросом добавляем token
                 config.headers = config.headers || {};
+				// Проверка статуса авторизации
+				serviceVK.getLoginStatus();
 				/*
 					Проверять VK.Auth.getLoginStatus перед каждым запросом					
 					для авторизованных пользователей показывать страницу secter
