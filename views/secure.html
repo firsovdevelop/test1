@@ -1,3 +1,9 @@
-<div>
-Персональная страница
+<div class="content">
+<span>Персональная страница</span> <a href="" ng-click="page.VK.logout();">Выход</a>
+<table class="userinfo">
+<tr>
+	<td><img ng-src="{{page.user.photo}}"></td>
+	<td><span>{{page.user.firstName}} {{page.user.lastName}}</span></td>
+</tr>
+</table>
 </div>
