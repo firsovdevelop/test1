@@ -23,12 +23,14 @@ myApp.service('serviceVK', ['$location', function($location) {
 	var self = this;
 
 	this.loginStatus = false; // Статус авторизации
+	this.user = {};
 	
 	// Авторизация
 	this.login = function(callback){
 		callback = callback || undefined;
 		// Вызов API		
 		VK.Auth.login(function(response) {
+				console.log(response);
                 if (!response.session) {                    
                     return;
                 }
@@ -48,13 +50,14 @@ myApp.service('serviceVK', ['$location', function($location) {
 	}
 	
 	// Проверка авторизации
-	this.getLoginStatus = function(){
+	this.getLoginStatus = function(){	
 		// Вызов API	
-		VK.Auth.getLoginStatus(function(response) { 					
-			if (response.session) { 
+		VK.Auth.getLoginStatus(function(response) {			
+			if (response.status == 'connected') { 
 				// Пользователь авторизован				
-				self.loginStatus = true;
-				console.log('Пользователь авторизован');
+				self.loginStatus = true;				
+				self.getUser();
+				console.log('Пользователь авторизован');			
 			} else { 
 				// Пользователь не авторизован
 				self.loginStatus = false;
@@ -63,40 +66,96 @@ myApp.service('serviceVK', ['$location', function($location) {
 		});	
 	};
 	
-	this.redirectTo = function(path) {
-		console.log('перенаправление в: '+path);
-		$rootScope.apply($location.path(path));
+	// Получение данных сессии
+	this.getSession = function(){			
+		// Вызов API
+		var session = VK.Auth.getSession();			
 	};
+	
+	// Получение информации о пользователе
+	this.getUser = function(callback){
+		callback = callback || undefined;
+		VK.Api.call('users.get', {fields:'photo'}, function(r) {
+			  if(r.response) {
+				self.user.firstName = r.response[0].first_name;
+				self.user.lastName = r.response[0].last_name;
+				self.user.photo = r.response[0].photo;								
+				if(callback) {
+					callback();
+				}
+			  }
+		});
+	};
+
+	
 }]);
 
 myApp.controller('pageCtrl', ['$scope', '$location', 'serviceVK', function($scope, $location, serviceVK) {
 		
 	var self = this;
 	
+	
+	this.user = {
+		firstName: undefined,
+		lastName: undefined,
+		photo: undefined
+	}
+			
+	this.getCookie = function(name) {
+        var matches = document.cookie.match(new RegExp(
+            "(?:^|; )" + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + "=([^;]*)"
+        ));
+        return matches ? decodeURIComponent(matches[1]) : undefined;
+    }
+	
 	this.VK = {};	
+	
 	this.VK.login = function() {
-		serviceVK.login(function(){
-					$scope.$apply($location.path('/secure')); 								
-		});		
+		serviceVK.login(function(){																						
+					$scope.$apply($location.path('/secure'));
+					serviceVK.getUser(function(){
+						console.log('action');
+						self.user.firstName = serviceVK.user.firstName; 
+						self.user.lastName = serviceVK.user.lastName;
+						self.user.photo = serviceVK.user.photo;
+						$scope.$apply();
+						console.log(self.user);
+					}); // Информации о пользователе					
+					console.log(self.getCookie('vk_app_5763775'));
+		});	
 	};
 	
 	this.VK.logout = function() {
 		serviceVK.logout();
 		$location.url('/login');
 	};
+	
+	this.VK.initialisation = function() {
+		console.log('ini');
+		serviceVK.getUser(function(){
+						console.log('action');
+						self.user.firstName = serviceVK.user.firstName; 
+						self.user.lastName = serviceVK.user.lastName;
+						self.user.photo = serviceVK.user.photo;
+						$scope.$apply();
+						console.log(self.user);
+					}); 
+	}
+	this.VK.initialisation();
+		
 }]);	
 
 
 
 // Эксперимент Interceptor 
-myApp.factory('MyAuthInterceptor', ['$window', '$q', '$location', '$log', 'serviceVK', function($window, $q, $location, $log, serviceVK) {
-        
-		$log.debug('Начало авторизации');
-		serviceVK.getLoginStatus();	// Проверка статуа авторизации
+myApp.factory('MyAuthInterceptor', ['$q', '$location', '$log', 'serviceVK', function($q, $location, $log, serviceVK) {
+        		
+		// Проверка статуса авторизации
+		serviceVK.getLoginStatus(); // Проверка статуcа авторизации
 		
         return {
             request: function(config) {
-				// Перед каждым запросом добавляем token
+								
                 config.headers = config.headers || {};
 				// Проверка статуса авторизации			
 				$log.debug('запрос...');
@@ -108,11 +167,7 @@ myApp.factory('MyAuthInterceptor', ['$window', '$q', '$location', '$log', 'servi
 					// Пользователь не авторизован					
 					$location.url('/login');		
 				}	
-				/*			
-                if ($window.localStorage.getItem('token')) {
-					// Подстановка значения token					
-                    config.headers.Authorization = 'token ' + $window.localStorage.getItem('token');
-                }	*/	
+			                
                 return config || $q.when(config);
             },
             response: function(response) {
